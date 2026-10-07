@@ -10,8 +10,8 @@ The MyF5 Downloads API organizes software according to the following tree struct
 
 ```
 Product Family (e.g., BIG-IP, NGINX, BIG-IQ)
-  └── Product Line (e.g., big-ip_v17.x, big-ip_v16.x)
-        └── Product Version (e.g., 17.1.1, 16.1.4)
+  └── Product Line (e.g., big-ip_v21.x, big-ip_v17.x, big-ip_v16.x)
+        └── Product Version (e.g., 21.1.0, 21.0.0, 17.1.1, 16.1.4)
               └── Container / Category (e.g., GeoLocationUpdates, Virtual Edition, Hotfix)
                     └── Download File (e.g., GeoLocationUpdates_Pulse)
 ```
@@ -29,7 +29,10 @@ Because GeoLocation database formats vary between BIG-IP versions, there is a di
   - `GET /v1/downloads-management/v1/downloads/product/.../{fileName}`: Fetches region-specific pre-signed AWS/CloudFront download links.
 - **Intelligent "Last File" Resolution**:
   - Compares timestamps from `meta.uploadDate`, `releaseDate`, and embedded file dates (`YYYYMMDD`).
-  - Supports semantic version sorting (`17.1.1` > `16.1.4`).
+  - Supports semantic version sorting (`21.1.0` > `21.0.0` > `17.1.1` > `16.1.4`).
+- **Flexible Product Line Shortcuts & Multi-Line Downloads**:
+  - Shorthand line names like `21.x` or `17.x` automatically resolve to `big-ip_v21.x`, `big-ip_v17.x`.
+  - Download across multiple product lines in a single command using comma separation (e.g., `--product-line 17.x,21.x`).
 - **Reliable Download & Integrity Verification**:
   - Chunked streaming download with live progress bar (download speed, percentage, ETA).
   - Validates `SHA-256` (both hexadecimal and base64 encodings) and `MD5` checksums against API metadata before finalizing the file.
@@ -119,32 +122,47 @@ You can provide credentials in three ways:
 
 You can run the tool either via `python download_geodb.py` or `geodb-download`.
 
-### 1. Download for a Specific Product Version
+> **Note on Product Lines**: You can use convenient shorthand names such as `21.x` or `17.x` instead of typing `big-ip_v21.x` or `big-ip_v17.x`.
+
+### 1. Download for Product Line 21.x
+Download the latest `GeoLocationUpdates_Pulse` for product line `21.x` (defaults to the newest version, `21.1.0`):
+```bash
+python download_geodb.py --product-line 21.x
+```
+
+Or target a specific version like `21.0.0` or `21.1.0`:
+```bash
+python download_geodb.py --product-line 21.x --version 21.0.0
+python download_geodb.py --product-line 21.x --version 21.1.0
+```
+
+### 2. Download for a Specific BIG-IP 17.x Version
 Download the latest `GeoLocationUpdates_Pulse` for BIG-IP version `17.1.1`:
 ```bash
-python download_geodb.py --product-line big-ip_v17.x --version 17.1.1
+python download_geodb.py --product-line 17.x --version 17.1.1
 ```
 
-### 2. Download for the Latest Version
-If `--version` is omitted, the tool automatically picks the newest version for the product line:
+### 3. Download the Last Pulse File for All Versions in a Product Line
+Download the latest `GeoLocationUpdates_Pulse` for **every** product version in `21.x` (both `21.1.0` and `21.0.0`):
 ```bash
-python download_geodb.py --product-line big-ip_v17.x
-```
-
-### 3. Download the Last Pulse File for All Versions
-Download the latest `GeoLocationUpdates_Pulse` for **every** product version in that product line:
-```bash
-python download_geodb.py --product-line big-ip_v17.x --all-versions --organize-by-version
+python download_geodb.py --product-line 21.x --all-versions --organize-by-version
 ```
 Files will be saved cleanly into `./downloads/<version>/GeoLocationUpdates_Pulse_...`.
 
-### 4. Dry Run (Preview without downloading)
-See what files match without downloading them:
+### 4. Download Across Multiple Product Lines (e.g. 17.x and 21.x)
+Pass comma-separated product lines to download across families or major releases at once:
 ```bash
-python download_geodb.py --product-line big-ip_v17.x --all-versions --dry-run
+python download_geodb.py --product-line 17.x,21.x --all-versions --organize-by-version
 ```
 
-### 5. Listing Available Metadata & Files
+### 5. Dry Run (Preview without downloading)
+See what files match without downloading them:
+```bash
+python download_geodb.py --product-line 21.x --all-versions --dry-run
+python download_geodb.py --product-line 17.x,21.x --all-versions --dry-run
+```
+
+### 6. Listing Available Metadata & Files
 List available product lines:
 ```bash
 python download_geodb.py list lines --family BIG-IP
@@ -152,19 +170,19 @@ python download_geodb.py list lines --family BIG-IP
 
 List available versions for a line:
 ```bash
-python download_geodb.py list versions --product-line big-ip_v17.x
+python download_geodb.py list versions --product-line 21.x
 ```
 
 List all available `GeoLocationUpdates_Pulse` files across versions:
 ```bash
-python download_geodb.py list pulse --product-line big-ip_v17.x
+python download_geodb.py list pulse --product-line 21.x
 ```
 
-### 6. Custom Directory and Preferences
+### 7. Custom Directory and Preferences
 ```bash
 python download_geodb.py \
-  --product-line big-ip_v17.x \
-  --version 17.1.1 \
+  --product-line 21.x \
+  --version 21.1.0 \
   --output-dir /var/shared/geodb \
   --location "USA - WEST COAST" \
   --overwrite

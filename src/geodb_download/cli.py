@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Optional
 
@@ -104,6 +105,37 @@ def get_client(
     )
 
 
+def _match_single_line(all_lines: list[str], token: str) -> str:
+    cleaned = token.strip()
+    # 1. Exact match (case-insensitive)
+    for line in all_lines:
+        if line.lower() == cleaned.lower():
+            return line
+
+    # 2. Match with "big-ip_" and/or "v" prefixes
+    # e.g., "21.x" -> "big-ip_v21.x", "v21.x" -> "big-ip_v21.x"
+    norm = cleaned.lower()
+    for line in all_lines:
+        l_lower = line.lower()
+        if (
+            l_lower == f"big-ip_{norm}"
+            or l_lower == f"big-ip_v{norm.lstrip('v')}"
+            or l_lower == f"v{norm.lstrip('v')}"
+            or (norm.endswith(".x") and norm in l_lower)
+            or (norm.endswith(".x") and f"v{norm}" in l_lower)
+        ):
+            return line
+
+    # 3. Substring match
+    matches = [line for line in all_lines if cleaned.lower() in line.lower()]
+    if len(matches) == 1:
+        return matches[0]
+
+    raise MyF5Error(
+        f"Product line '{token}' not found.\nAvailable lines: {', '.join(all_lines)}"
+    )
+
+
 def resolve_product_lines(
     client: MyF5Client,
     product_family: str,
@@ -126,18 +158,19 @@ def resolve_product_lines(
     all_lines = [pl.name for pl in family_match.product_lines]
 
     if not product_line:
-        # If product_line not given, check if BIG-IP lines exist and return them
-        return all_lines
+        # If product_line not given, filter for actual BIG-IP release lines (e.g. big-ip_v21.x, big-ip_v17.x)
+        release_lines = [l for l in all_lines if re.match(r"(?i)big-ip_v\d+", l)]
+        return release_lines if release_lines else all_lines
 
-    # Verify requested product line exists (case-insensitive match)
-    for line in all_lines:
-        if line.lower() == product_line.lower():
-            return [line]
+    # Support comma-separated or semicolon-separated tokens (e.g. "17.x, 21.x")
+    tokens = [t.strip() for t in re.split(r"[,;]+", product_line) if t.strip()]
+    resolved: list[str] = []
+    for t in tokens:
+        matched_line = _match_single_line(all_lines, t)
+        if matched_line not in resolved:
+            resolved.append(matched_line)
 
-    raise MyF5Error(
-        f"Product line '{product_line}' not found in family '{product_family}'.\n"
-        f"Available lines: {', '.join(all_lines)}"
-    )
+    return resolved
 
 
 def execute_download(
@@ -341,7 +374,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="What to list (families, lines, versions, pulse)",
     )
     list_parser.add_argument("--family", default="BIG-IP", help="Product Family (default: BIG-IP)")
-    list_parser.add_argument("--product-line", "-l", help="Product Line (e.g. big-ip_v17.x)")
+    list_parser.add_argument(
+        "--product-line",
+        "-l",
+        help="Product Line (e.g. 21.x, 17.x, big-ip_v21.x, big-ip_v17.x). Can be comma-separated.",
+    )
 
     # Also add download arguments to root parser so running without 'download' subcommand works directly
     _add_download_arguments(parser)
@@ -354,7 +391,7 @@ def _add_download_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--product-line",
         "-l",
-        help="Product Line (e.g., big-ip_v17.x, big-ip_v16.x). If omitted, searches all BIG-IP lines.",
+        help="Product Line (e.g., 21.x, 17.x, big-ip_v21.x, big-ip_v17.x). Can be comma-separated. If omitted, searches all BIG-IP lines.",
     )
     p.add_argument(
         "--version",

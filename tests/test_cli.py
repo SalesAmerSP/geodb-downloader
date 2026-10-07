@@ -101,3 +101,37 @@ def test_cli_list_lines(capsys):
         captured = capsys.readouterr()
         assert "big-ip_v17.x" in captured.out
         assert "big-ip_v16.x" in captured.out
+
+
+def test_resolve_product_lines_shortcuts():
+    from geodb_download.cli import resolve_product_lines
+    from geodb_download.models import ProductFamilyInfo, ProductLineInfo
+
+    mock_client = MagicMock()
+    mock_client.get_metadata.return_value = [
+        ProductFamilyInfo(
+            name="BIG-IP",
+            product_lines=[
+                ProductLineInfo(name="big-ip_v21.x"),
+                ProductLineInfo(name="big-ip_v17.x"),
+                ProductLineInfo(name="big-ip_v16.x"),
+                ProductLineInfo(name="F5Insight"),
+            ],
+        )
+    ]
+
+    # Test exact match
+    assert resolve_product_lines(mock_client, "BIG-IP", "big-ip_v21.x") == ["big-ip_v21.x"]
+
+    # Test shortcut "21.x"
+    assert resolve_product_lines(mock_client, "BIG-IP", "21.x") == ["big-ip_v21.x"]
+
+    # Test shortcut "17.x"
+    assert resolve_product_lines(mock_client, "BIG-IP", "17.x") == ["big-ip_v17.x"]
+
+    # Test comma-separated multiple lines
+    assert resolve_product_lines(mock_client, "BIG-IP", "17.x, 21.x") == ["big-ip_v17.x", "big-ip_v21.x"]
+
+    # Test default filtering when omitted (only big-ip release lines)
+    assert resolve_product_lines(mock_client, "BIG-IP", None) == ["big-ip_v21.x", "big-ip_v17.x", "big-ip_v16.x"]
+
