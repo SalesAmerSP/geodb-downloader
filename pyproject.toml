@@ -1,0 +1,24 @@
+[project]
+name = "geodb-download"
+version = "0.1.0"
+description = "Download latest GeoLocationUpdates_Pulse files from MyF5 Downloads API"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "packaging>=24.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+geodb-download = "geodb_download.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
